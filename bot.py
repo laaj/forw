@@ -2,9 +2,9 @@ import logging
 import os
 import psutil
 import telegram
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.constants import ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, ConversationHandler, CallbackContext, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, CallbackContext, CallbackQueryHandler, Filters
 from pymongo import MongoClient
 from config import BOT_TOKEN, MONGODB_URI, API_ID, API_HASH
 
@@ -22,8 +22,7 @@ user_settings_collection = db['user_settings']
 forwarded_messages_collection = db['forwarded_messages']
 
 # Define conversation states if needed
-STATE_ONE, STATE_TWO = range(2)
-CHOOSING, SELECT_OPTION, SETTING_NAME, SETTING_VALUE = range(4)
+CHOOSING, SELECT_OPTION = range(2)
 
 # Define command handlers
 def start(update: Update, context: CallbackContext):
@@ -34,15 +33,6 @@ def start(update: Update, context: CallbackContext):
         f"ɪ ᴄᴀɴ ꜰᴏʀᴡᴀʀᴅ ᴀʟʟ ᴍᴇssᴀɢᴇ ꜰʀᴏᴍ ᴏɴᴇ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴀɴᴏᴛʜᴇʀ ᴄʜᴀɴɴᴇʟ\n"
         f"ᴄʟɪᴄᴋ ʜᴇʟᴘ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴋɴᴏᴡ ᴍᴏʀᴇ ᴀʙᴏᴜᴛ ᴍᴇ"
     )
-    return ConversationHandler.END
-    
-def donate(update: Update, context: CallbackContext):
-    donate_message = (
-        "If you liked me ❤️, consider making a donation to support my developer 👦\n"
-        "UPI ID - `krishna527062@oksbi`"
-    )
-    update.message.reply_text(donate_message, parse_mode=ParseMode.MARKDOWN)
-
 
 def help_command(update: Update, context: CallbackContext):
     update.message.reply_text(
@@ -67,20 +57,6 @@ def help_command(update: Update, context: CallbackContext):
         "► skip messages based on extensions & keywords & size"
     )
 
-def private_forward(update: Update, context: CallbackContext):
-    # Handle private forwarding of messages
-    pass
-
-    
-def forward_message(update: Update, context: CallbackContext):
-    # Handle forwarding messages from one chat to another
-    pass
-
-
-# Dictionary to store user settings
-user_settings = {}
-
-# Function to start the settings conversation
 def start_settings(update: Update, context: CallbackContext):
     user = update.effective_user
     reply_keyboard = [
@@ -98,11 +74,9 @@ def start_settings(update: Update, context: CallbackContext):
 
     return CHOOSING
 
-# Function to handle user choice in settings
 def select_option(update: Update, context: CallbackContext):
     query = update.callback_query
     option = query.data
-    user_settings['current_option'] = option
 
     if option == 'bots':
         query.message.reply_html("You can manage your bots here.")
@@ -121,7 +95,6 @@ def select_option(update: Update, context: CallbackContext):
 
     return CHOOSING
 
-# Function to end the settings conversation
 def end_settings(update: Update, context: CallbackContext):
     query = update.callback_query
     query.message.reply_text("Your settings have been updated.")
@@ -129,7 +102,7 @@ def end_settings(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 def main():
-    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+    updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
     # Define conversation handler for settings
@@ -143,188 +116,9 @@ def main():
 
     dispatcher.add_handler(settings_conv_handler)
 
-
-def how_to_use(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "⚠️ Before Forwarding:\n"
-        "► First add a bot or userbot\n"
-        "► Add at least one target channel (your bot/userbot must be admin there)\n"
-        "► You can add chats or bots by using /settings\n"
-        "► If the Source Channel is private, your userbot must be a member there, or your bot must need admin permission there also\n"
-        "► Then use /forward to forward messages"
-    )
-
-
-def status(update: Update, context: CallbackContext):
-    # Calculate statistics
-    total_users = user_collection.count_documents({})
-    total_bots = user_collection.count_documents({"is_bot": True})
-    total_forwarded_messages = forwarded_messages_collection.count_documents({})
-    
-    # You should implement the logic to count unequified messages
-    total_unequified_messages = 0  # Implement this
-    
-    status_message = (
-        f"╔════❰ ʙᴏᴛ sᴛᴀᴛᴜs ❱═❍⊱❁۪۪\n"
-        f"║╭━━━━━━━━━━━━━━━➣\n"
-        f"║┣⪼👱 ᴛᴏᴛᴀʟ ᴜsᴇʀs: {total_users}\n"
-        f"║┃\n"
-        f"║┣⪼🤖 ᴛᴏᴛᴀʟ ʙᴏᴛ: {total_bots}\n"
-        f"║┃\n"
-        f"║┣⪼🔃 ғᴏʀᴡᴀʀᴅɪɴɢs: {total_forwarded_messages}\n"
-        f"║┃\n"
-        f"║┣⪼🔍 ᴜɴᴇǫᴜɪꜰʏɪɴɢs: {total_unequified_messages}\n"
-        f"║╰━━━━━━━━━━━━━━━➣\n"
-        f"╚══════════════════❍⊱❁۪۪"
-    )
-    
-    update.message.reply_text(status_message, parse_mode='Markdown')
-
-def server_status(update: Update, context: CallbackContext):
-    # Get server status information
-    total_disk_space = psutil.disk_usage('/').total / (1024 ** 3)  # Convert to GB
-    used_disk_space = psutil.disk_usage('/').used / (1024 ** 3)  # Convert to GB
-    free_disk_space = psutil.disk_usage('/').free / (1024 ** 3)  # Convert to GB
-    cpu_usage = psutil.cpu_percent()
-    ram_usage = psutil.virtual_memory().percent
-
-    status_message = (
-        f"╔════❰ sᴇʀᴠᴇʀ sᴛᴀᴛs ❱═❍⊱❁۪۪\n"
-        f"║╭━━━━━━━━━━━━━━━➣\n"
-        f"║┣⪼ ᴛᴏᴛᴀʟ ᴅɪsᴋ sᴘᴀᴄᴇ: {total_disk_space:.2f} GB\n"
-        f"║┣⪼ ᴜsᴇᴅ: {used_disk_space:.2f} GB\n"
-        f"║┣⪼ ꜰʀᴇᴇ: {free_disk_space:.2f} GB\n"
-        f"║┣⪼ ᴄᴘᴜ: {cpu_usage}%\n"
-        f"║┣⪼ ʀᴀᴍ: {ram_usage}%\n"
-        f"║╰━━━━━━━━━━━━━━━➣\n"
-        f"╚══════════════════❍⊱❁۪۪"
-    )
-
-    update.message.reply_text(status_message, parse_mode='Markdown')
-    
-def bots(update: Update, context: CallbackContext):
-    # Handle bot management (add, remove, etc.)
-    pass
-    
-def dummy_bot(update: Update, context: CallbackContext):
-    # Handle adding a dummy bot
-    pass
-    
-def user_bot(update: Update, context: CallbackContext):
-    # Handle adding a userbot
-    pass
-    
-def channels(update: Update, context: CallbackContext):
-    # Handle channel management (add, remove, etc.)
-    pass
-    
-def add_chat(update: Update, context: CallbackContext):
-    # Handle adding a chat to the configuration
-    pass
-    
-def about(update: Update, context: CallbackContext):
-    about_message = (
-        "╔════❰ ғᴏʀᴡᴀʀᴅ ʙᴏᴛ ❱═❍⊱❁۪۪\n"
-        "║╭━━━━━━━━━━━━━━━➣\n"
-        "║┣⪼📃ʙᴏᴛ : ғᴏʀᴡᴀʀᴅ ʙᴏᴛ\n"
-        "║┣⪼👦ᴄʀᴇᴀᴛᴏʀ : ᴍadhu\n"
-        "║┣⪼📡ʜᴏsᴛᴇᴅ ᴏɴ : Render\n"
-        "║┣⪼🗣️ʟᴀɴɢᴜᴀɢᴇ : ᴘʏᴛʜᴏɴ3\n"
-        "║┣⪼📚ʟɪʙʀᴀʀʏ : ᴘʏʀᴏɢʀᴀᴍ ᴀsʏɴᴄɪᴏ 2.0.0\n"
-        "║┣⪼🗒️ᴠᴇʀsɪᴏɴ : 1.0.0\n"
-        "║╰━━━━━━━━━━━━━━━➣\n"
-        "╚══════════════════❍⊱❁۪۪"
-    )
-    update.message.reply_text(about_message, parse_mode=ParseMode.MARKDOWN)
-    
-def caption(update: Update, context: CallbackContext):
-    # Handle custom caption settings
-    pass
-    
-def database(update: Update, context: CallbackContext):
-    # Handle database settings (e.g., adding MongoDB)
-    pass
-    
-def filters(update: Update, context: CallbackContext):
-    # Handle message filtering settings
-    pass
-    
-def button(update: Update, context: CallbackContext):
-    # Handle custom button settings
-    pass
-    
-def add_caption(update: Update, context: CallbackContext):
-    # Handle adding a custom caption to messages
-    pass
-    
-def add_mongodb_database(update: Update, context: CallbackContext):
-    # Handle adding MongoDB database information
-    pass
-    
-def add_database(update: Update, context: CallbackContext):
-    # Handle adding a database information
-    pass
-
-def filters(update: Update, context: CallbackContext):
-    # Handle message filtering settings
-    pass
-
-def next(update: Update, context: CallbackContext):
-    # Handle the "Next" button to continue filter settings
-    pass
-
-def add_button(update: Update, context: CallbackContext):
-    # Handle adding a custom button
-    pass
-
-# Conversation handler for filter settings
-filter_settings_conversation = ConversationHandler(
-    entry_points=[CommandHandler('filters', filters)],
-    states={
-        STATE_ONE: [MessageHandler(filters.text & ~filters.command, next)],
-        STATE_TWO: [MessageHandler(filters.text & ~filters.command, add_button)],
-    },
-    fallbacks=[],
-)
-
-# Add command handlers
-dispatcher.add_handler(CommandHandler('add_database', add_database))
-dispatcher.add_handler(filter_settings_conversation)  # Add conversation handler for filters
-
-
-# Add other handlers and conversation handlers as needed
-
-# Initialize the Updater and dispatcher
-updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-dispatcher = updater.dispatcher
-
-# Register command handlers
-dispatcher.add_handler(CommandHandler('start', start))
-dispatcher.add_handler(CommandHandler('help', help_command))
-dispatcher.add_handler(CommandHandler('private_forward', private_forward))
-dispatcher.add_handler(CommandHandler('server_status', server_status))
-dispatcher.add_handler(CommandHandler('bots', bots))
-dispatcher.add_handler(CommandHandler('dummy_bot', dummy_bot))
-dispatcher.add_handler(CommandHandler('user_bot', user_bot))
-dispatcher.add_handler(CommandHandler('channels', channels))
-dispatcher.add_handler(CommandHandler('add_chat', add_chat))
-dispatcher.add_handler(CommandHandler('about', about))
-dispatcher.add_handler(CommandHandler('caption', caption))
-dispatcher.add_handler(CommandHandler('database', database))
-dispatcher.add_handler(CommandHandler('filters', filters))
-dispatcher.add_handler(CommandHandler('button', button))
-dispatcher.add_handler(CommandHandler('add_caption', add_caption))
-dispatcher.add_handler(CommandHandler('add_mongodb_database', add_mongodb_database))
-dispatcher.add_handler(CommandHandler('status', status))
-dispatcher.add_handler(CommandHandler('donate', donate))
-dispatcher.add_handler(CommandHandler('how_to_use', how_to_use))
-dispatcher.add_handler(CommandHandler('forward', forward_message))
-dispatcher.add_handler(CommandHandler('settings', settings))
-
-
-# Start the bot
-updater.start_polling()
-updater.idle()
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
